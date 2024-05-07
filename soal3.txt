@@ -1,0 +1,49 @@
+DELIMITER //
+
+CREATE PROCEDURE laporan_mutasi_kas()
+BEGIN
+    DECLARE done INT DEFAULT FALSE;
+    DECLARE tanggal DATE;
+    DECLARE masuk INT;
+    DECLARE keluar INT;
+
+    DECLARE cur CURSOR FOR
+        SELECT tanggal, nominal, 0 FROM uangmasuk
+        UNION ALL
+        SELECT tanggal, 0, nominal FROM uangkeluar
+        ORDER BY tanggal;
+
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
+
+    DROP TEMPORARY TABLE IF EXISTS mutasi_kas_temp;
+    CREATE TEMPORARY TABLE mutasi_kas_temp (
+        tanggal DATE,
+        masuk INT,
+        keluar INT,
+        saldo INT
+    );
+
+    OPEN cur;
+
+    SET @saldo := 0;
+
+    read_loop: LOOP
+        FETCH cur INTO tanggal, masuk, keluar;
+        IF done THEN
+            LEAVE read_loop;
+        END IF;
+
+        SET @saldo := @saldo + masuk - keluar;
+        
+        INSERT INTO mutasi_kas_temp (tanggal, masuk, keluar, saldo)
+        VALUES (tanggal, masuk, keluar, @saldo);
+    END LOOP;
+
+    CLOSE cur;
+
+    SELECT * FROM mutasi_kas_temp;
+
+    DROP TEMPORARY TABLE mutasi_kas_temp;
+END//
+
+DELIMITER ;
